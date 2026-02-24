@@ -1,77 +1,87 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const { createClient } = require('@libsql/client');
+require('dotenv').config({ path: '../.env' }); // Load from root dir
 
-const dbPath = path.join(__dirname, 'itrc.db');
-const db = new Database(dbPath);
+// 優先使用環境變數中的連線資訊，如果沒有則使用本地端 SQLite (fallback for local development if not provided)
+const db = createClient({
+  url: process.env.TURSO_DATABASE_URL || 'file:./itrc.db',
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-// Enable WAL mode for better concurrent read performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+async function initDB() {
+  try {
+    // Create tables
+    await db.executeMultiple(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username text UNIQUE NOT NULL,
+        password_hash text NOT NULL,
+        role text DEFAULT 'admin',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
 
-// Create tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    role TEXT DEFAULT 'admin',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+      CREATE TABLE IF NOT EXISTS sections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key text UNIQUE NOT NULL,
+        title text NOT NULL,
+        content text NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
 
-  CREATE TABLE IF NOT EXISTS sections (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    key TEXT UNIQUE NOT NULL,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+      CREATE TABLE IF NOT EXISTS achievements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        semester text NOT NULL,
+        title text NOT NULL,
+        category text,
+        description text,
+        link text,
+        order_num INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
 
-  CREATE TABLE IF NOT EXISTS achievements (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    semester TEXT NOT NULL,
-    title TEXT NOT NULL,
-    category TEXT,
-    description TEXT,
-    link TEXT,
-    order_num INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+      CREATE TABLE IF NOT EXISTS members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name text NOT NULL,
+        role text,
+        department text,
+        year text,
+        avatar_url text,
+        order_num INTEGER DEFAULT 0
+      );
 
-  CREATE TABLE IF NOT EXISTS members (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    role TEXT,
-    department TEXT,
-    year TEXT,
-    avatar_url TEXT,
-    order_num INTEGER DEFAULT 0
-  );
+      CREATE TABLE IF NOT EXISTS activities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type text NOT NULL CHECK(type IN ('record', 'plan')),
+        title text NOT NULL,
+        date text,
+        description text,
+        speaker text,
+        image_url text,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
 
-  CREATE TABLE IF NOT EXISTS activities (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL CHECK(type IN ('record', 'plan')),
-    title TEXT NOT NULL,
-    date TEXT,
-    description TEXT,
-    speaker TEXT,
-    image_url TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+      CREATE TABLE IF NOT EXISTS experiences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        author text NOT NULL,
+        title text NOT NULL,
+        content text NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
 
-  CREATE TABLE IF NOT EXISTS experiences (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    author TEXT NOT NULL,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
+    // Migration: add speaker column if missing (for existing local DBs)
+    try {
+      await db.execute('ALTER TABLE activities ADD COLUMN speaker text');
+    } catch (e) {
+      // Column already exists or other error, ignore
+    }
 
-// Migration: add speaker column if missing (for existing databases)
-try {
-  db.exec('ALTER TABLE activities ADD COLUMN speaker TEXT');
-} catch (e) {
-  // Column already exists, ignore
+    console.log('Database initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+  }
 }
+
+// Start initialization immediately
+initDB();
 
 module.exports = db;

@@ -2,118 +2,139 @@ const bcrypt = require('bcryptjs');
 const db = require('./db');
 
 console.log('Seeding database...');
+async function seed() {
+    console.log('Waiting for database to initialize...');
+    // Give initDB a moment to run from db.js (in a real app, we'd export a ready promise, but this simple delay works for the seed script)
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-// Create admin user
-const passwordHash = bcrypt.hashSync('admin123', 10);
-const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
-if (!existingUser) {
-    db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)').run('admin', passwordHash, 'admin');
-    console.log('✓ Admin user created (admin / admin123)');
-} else {
-    console.log('⊘ Admin user already exists');
-}
+    try {
+        console.log('Starting seed process...');
 
-// Seed sections
-const sections = [
-    {
-        key: 'course_intro',
-        title: '課程簡介',
-        content: '中山投研社透過系統化課程、案例討論與期末競賽，結合理論與市場實務，提升成員投資研究與理財規劃能力，並藉由師資指導、資源共享與團隊合作，培養金融領域核心競爭力。'
-    },
-    {
-        key: 'course_info',
-        title: '課程資訊 Info.',
-        content: JSON.stringify({
-            time: '每週五 18:00 - 21:00',
-            location: '管理學院 CM1037',
-            coordinators: '張大恒、李沁彤、許筠采',
-            email: 'zhongshantouyan@gmail.com',
-            ig: 'nsysu_itrc'
-        })
-    },
-    {
-        key: 'hero_title',
-        title: 'Hero 標題',
-        content: '中山大學投資交易研究社'
-    },
-    {
-        key: 'hero_subtitle',
-        title: 'Hero 副標題',
-        content: 'NSYSU Investment & Trading Research Club, ITRC'
+        // Admin User
+        const existingUsers = await db.execute('SELECT COUNT(*) as count FROM users');
+        if (existingUsers.rows[0].count === 0) {
+            const hash = bcrypt.hashSync('itrc2025', 10);
+            await db.execute({
+                sql: "INSERT INTO users (username, password_hash, role) VALUES ('admin', ?, 'admin')",
+                args: [hash]
+            });
+            console.log('✓ Default admin user created (admin / itrc2025)');
+        } else {
+            console.log('⊘ Admin user already exists');
+        }
+
+        // Default Sections
+        const existingSections = await db.execute('SELECT COUNT(*) as count FROM sections');
+        if (existingSections.rows[0].count === 0) {
+            const sections = [
+                {
+                    key: 'hero_title',
+                    title: '首頁大標題',
+                    content: '中山投研'
+                },
+                {
+                    key: 'hero_subtitle',
+                    title: '首頁副標題',
+                    content: 'NSYSU Investment & Trading Research Club - 系統化課程規劃與實戰操作'
+                },
+                {
+                    key: 'course_intro',
+                    title: '課程簡介',
+                    content: '中山投研社透過系統化課程、案例討論與期末競賽，結合理論與市場實務，提升成員投資研究與理財規劃能力，並藉由師資指導、資源共享與團隊合作，培養金融領域核心競爭力。'
+                },
+                {
+                    key: 'course_info',
+                    title: '課程資訊 Info.',
+                    content: JSON.stringify({
+                        time: '每週五 18:00 - 21:00',
+                        location: '管理學院 CM1037',
+                        coordinators: '張大恒、李沁彤、許筠采',
+                        email: 'zhongshantouyan@gmail.com',
+                        ig: 'nsysu_itrc'
+                    })
+                }
+            ];
+
+            for (const s of sections) {
+                await db.execute({
+                    sql: 'INSERT INTO sections (key, title, content) VALUES (?, ?, ?)',
+                    args: [s.key, s.title, s.content]
+                });
+            }
+            console.log('✓ Default sections seeded');
+        } else {
+            console.log('⊘ Sections already exist');
+        }
+
+        // Default Achievements
+        const existingAchievements = await db.execute('SELECT COUNT(*) as count FROM achievements');
+        if (existingAchievements.rows[0].count === 0) {
+            await db.execute({
+                sql: "INSERT INTO achievements (semester, title, category, order_num) VALUES ('113-1', '全國投資競賽 第一名', '比賽', 1)",
+                args: []
+            });
+            console.log('✓ Default achievements seeded');
+        } else {
+            console.log('⊘ Achievements already exist');
+        }
+
+        // Team Members
+        const existingMembers = await db.execute('SELECT COUNT(*) as count FROM members');
+        if (existingMembers.rows[0].count === 0) {
+            const members = [
+                { name: '張大恒', role: '社長', department: '機電系大四' },
+                { name: '李沁彤', role: '副社長', department: '財管系大四' },
+                { name: '許筠采', role: '副社長', department: '財管系大四' },
+                { name: '盧威宇', role: '公關長', department: '財管系大三' },
+                { name: '吳品霆', role: '總務長', department: '財管系大三' },
+                { name: '楊紫翎', role: '行銷長', department: '行傳所碩一' }
+            ];
+
+            for (const [index, m] of members.entries()) {
+                await db.execute({
+                    sql: 'INSERT INTO members (name, role, department, order_num) VALUES (?, ?, ?, ?)',
+                    args: [m.name, m.role, m.department, index + 1]
+                });
+            }
+            console.log('✓ Default members seeded');
+        } else {
+            console.log('⊘ Members already exist');
+        }
+
+        // Activity Plans (from screenshot)
+        const activityPlans = [
+            { type: 'plan', date: '114年09月26日(五)', title: '社課介紹+破冰遊戲', speaker: '張大恒 社長' },
+            { type: 'plan', date: '114年10月03日(五)', title: '投資與交易的本質', speaker: '張大恒 社長' },
+            { type: 'plan', date: '114年10月10日 (五)', title: '國慶放假', speaker: '', description: '國慶放假' },
+            { type: 'plan', date: '114年10月17日(五)', title: '總體經濟指標', speaker: '黃泓睿 學長' },
+            { type: 'plan', date: '114年10月24日(五)', title: '產業分析入門與實務', speaker: '黃鑠恩 講師' },
+            { type: 'plan', date: '114年10月31日(五)', title: '財務報表分析入門與實務', speaker: '張大恒 社長' },
+            { type: 'plan', date: '114年11月07日(五)', title: '期中考週停課一次', speaker: '', description: '期中考週' },
+            { type: 'plan', date: '114年11月14日(五)', title: '技術分析入門與實務', speaker: '林家佑 學長' },
+            { type: 'plan', date: '114年11月21日(五)', title: '期末報告準備', speaker: '全體幹部' },
+            { type: 'plan', date: '114年11月28日(五)', title: '期末報告發表暨結業式', speaker: '全體幹部' },
+            { type: 'plan', date: '114年12月05日(五)', title: '企業參訪', speaker: '群益金鼎證券' }
+        ];
+
+        const existingActivities = await db.execute('SELECT COUNT(*) as count FROM activities');
+        if (existingActivities.rows[0].count === 0) {
+            for (const a of activityPlans) {
+                await db.execute({
+                    sql: 'INSERT INTO activities (type, date, title, speaker, description) VALUES (?, ?, ?, ?, ?)',
+                    args: [a.type, a.date, a.title, a.speaker || null, a.description || null]
+                });
+            }
+            console.log('✓ Activity plans seeded');
+        } else {
+            console.log('⊘ Activities already exist');
+        }
+
+        console.log('--- Seed completed ---');
+        process.exit(0);
+    } catch (err) {
+        console.error('Seed Error:', err);
+        process.exit(1);
     }
-];
-
-const insertSection = db.prepare('INSERT OR IGNORE INTO sections (key, title, content) VALUES (?, ?, ?)');
-sections.forEach(s => {
-    insertSection.run(s.key, s.title, s.content);
-});
-console.log('✓ Sections seeded');
-
-// Seed achievements
-const achievements = [
-    { semester: '114-1', title: '加密貨幣 期末分享', category: '加密貨幣', order_num: 1 },
-    { semester: '114-1', title: '台股 期末分享', category: '台股', order_num: 2 },
-    { semester: '114-1', title: '台股2 期末分享', category: '台股', order_num: 3 },
-    { semester: '114-1', title: '台股3 期末分享', category: '台股', order_num: 4 },
-    { semester: '114-1', title: '台股4 期末分享', category: '台股', order_num: 5 },
-    { semester: '114-1', title: '美股 期末分享', category: '美股', order_num: 6 },
-    { semester: '114-1', title: '美股2 期末分享', category: '美股', order_num: 7 },
-];
-
-const existingAchievements = db.prepare('SELECT COUNT(*) as count FROM achievements').get();
-if (existingAchievements.count === 0) {
-    const insertAchievement = db.prepare('INSERT INTO achievements (semester, title, category, order_num) VALUES (?, ?, ?, ?)');
-    achievements.forEach(a => {
-        insertAchievement.run(a.semester, a.title, a.category, a.order_num);
-    });
-    console.log('✓ Achievements seeded');
-} else {
-    console.log('⊘ Achievements already exist');
 }
 
-// Seed sample members
-const members = [
-    { name: '張大恒', role: '召集人', order_num: 1 },
-    { name: '李沁彤', role: '召集人', order_num: 2 },
-    { name: '許筠采', role: '召集人', order_num: 3 },
-];
-
-const existingMembers = db.prepare('SELECT COUNT(*) as count FROM members').get();
-if (existingMembers.count === 0) {
-    const insertMember = db.prepare('INSERT INTO members (name, role, order_num) VALUES (?, ?, ?)');
-    members.forEach(m => {
-        insertMember.run(m.name, m.role, m.order_num);
-    });
-    console.log('✓ Members seeded');
-} else {
-    console.log('⊘ Members already exist');
-}
-
-// Seed activity plans
-const activityPlans = [
-    { type: 'plan', date: '114年09月26日(五)', title: '社課介紹+破冰遊戲', speaker: '張大恒 社長' },
-    { type: 'plan', date: '114年10月03日(五)', title: '投資與交易的本質', speaker: '張大恒 社長' },
-    { type: 'plan', date: '114年10月10日 (五)', title: '國慶放假', speaker: '', description: '國慶放假' },
-    { type: 'plan', date: '114年10月17日(五)', title: '投資技術分析', speaker: '王昭文 教授' },
-    { type: 'plan', date: '114年10月21日(二)', title: '2025永續金融科技創新投資國際論壇', speaker: '專家學者與業內人士' },
-    { type: 'plan', date: '114年10月24日(五)', title: '光復節補假', speaker: '', description: '光復節補假' },
-    { type: 'plan', date: '114年10月31日(五)', title: '加密貨幣：Web3.0與交易策略', speaker: 'Ourbit團隊講師' },
-    { type: 'plan', date: '114年11月07日(五)', title: '估值與投資', speaker: 'Freddy Chen' },
-    { type: 'plan', date: '114年11月14日(五)', title: '基本面分析的經驗分享', speaker: 'Vincent Cheng-Wen Yu' },
-    { type: 'plan', date: '114年11月21日(五)', title: 'STO證券型代幣發行', speaker: '簡憶伶 襄理' },
-    { type: 'plan', date: '114年12月05日 (五)', title: '期末成果發表及媒合會', speaker: '張大恒 社長' },
-];
-
-const existingActivities = db.prepare('SELECT COUNT(*) as count FROM activities').get();
-if (existingActivities.count === 0) {
-    const insertActivity = db.prepare('INSERT INTO activities (type, date, title, speaker, description) VALUES (?, ?, ?, ?, ?)');
-    activityPlans.forEach(a => {
-        insertActivity.run(a.type, a.date, a.title, a.speaker || null, a.description || null);
-    });
-    console.log('✓ Activity plans seeded');
-} else {
-    console.log('⊘ Activities already exist');
-}
-
-console.log('Seeding complete!');
-
+seed();
