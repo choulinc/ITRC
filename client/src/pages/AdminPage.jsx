@@ -319,9 +319,10 @@ function MembersEditor() {
 // ===================== Activities Editor =====================
 function ActivitiesEditor() {
     const [items, setItems] = useState([]);
-    const [form, setForm] = useState({ type: 'plan', title: '', date: '', description: '', speaker: '' });
+    const [form, setForm] = useState({ type: 'plan', title: '', date: '', description: '', speaker: '', image_url: '' });
     const [editingId, setEditingId] = useState(null);
     const [msg, setMsg] = useState('');
+    const [uploading, setUploading] = useState(false);
 
     const fetchData = useCallback(async () => {
         const res = await api.get('/activities');
@@ -340,7 +341,7 @@ function ActivitiesEditor() {
                 await api.post('/activities', form);
                 setMsg('✓ 已新增');
             }
-            setForm({ type: 'plan', title: '', date: '', description: '', speaker: '' });
+            setForm({ type: 'plan', title: '', date: '', description: '', speaker: '', image_url: '' });
             setEditingId(null);
             fetchData();
         } catch (err) {
@@ -350,13 +351,44 @@ function ActivitiesEditor() {
 
     const handleEdit = (item) => {
         setEditingId(item.id);
-        setForm({ type: item.type, title: item.title, date: item.date || '', description: item.description || '', speaker: item.speaker || '' });
+        setForm({ type: item.type, title: item.title, date: item.date || '', description: item.description || '', speaker: item.speaker || '', image_url: item.image_url || '' });
     };
 
     const handleDelete = async (id) => {
         if (!window.confirm('確定要刪除嗎？')) return;
         await api.delete(`/activities/${id}`);
         fetchData();
+    };
+
+    const uploadImage = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setUploading(true);
+        setMsg('上傳圖片中...');
+        const formData = new FormData();
+        formData.append('image', file);
+        try {
+            // 使用 Imgur API上傳照片
+            const clientId = import.meta.env.VITE_IMGUR_CLIENT_ID || '546c25a59c58ad7';
+            const response = await fetch('https://api.imgur.com/3/image', {
+                method: 'POST',
+                headers: { 'Authorization': `Client-ID ${clientId}` },
+                body: formData
+            });
+            const result = await response.json();
+            if (result.success) {
+                setForm(prev => ({ ...prev, image_url: result.data.link }));
+                setMsg('✓ 圖片上傳成功');
+            } else {
+                throw new Error(result.data.error || 'Upload failed');
+            }
+        } catch (err) {
+            console.error('Imgur upload error:', err);
+            setMsg('❌ 圖片上傳失敗');
+        } finally {
+            setUploading(false);
+            e.target.value = ''; // Reset file input
+        }
     };
 
     return (
@@ -386,13 +418,21 @@ function ActivitiesEditor() {
                         <input placeholder="例: 王昭文 教授" value={form.speaker} onChange={e => setForm({ ...form, speaker: e.target.value })} />
                     </div>
                 </div>
-                <div className="form-group">
-                    <label>備註</label>
-                    <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} placeholder="選填，如：國慶放假、光復節補假" />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+                    <div className="form-group">
+                        <label>備註/其他連結</label>
+                        <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} placeholder="支援 Markdown 語法 (如: [顯示名稱](網址))" />
+                    </div>
+                    <div className="form-group">
+                        <label>活動照片 (Imgur上傳)</label>
+                        <input type="file" accept="image/*" onChange={uploadImage} disabled={uploading} style={{ marginBottom: 8 }} />
+                        <input placeholder="或直接貼上圖片網址" value={form.image_url} onChange={e => setForm({ ...form, image_url: e.target.value })} />
+                        {form.image_url && <img src={form.image_url} alt="預覽" style={{ marginTop: 10, maxHeight: 80, borderRadius: 5, objectFit: 'cover' }} />}
+                    </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button type="submit" className="btn btn-primary btn-sm">{editingId ? '更新' : '新增活動'}</button>
-                    {editingId && <button type="button" className="btn btn-outline btn-sm" onClick={() => { setEditingId(null); setForm({ type: 'plan', title: '', date: '', description: '', speaker: '' }); }}>取消</button>}
+                    <button type="submit" className="btn btn-primary btn-sm" disabled={uploading}>{editingId ? '更新' : '新增活動'}</button>
+                    {editingId && <button type="button" className="btn btn-outline btn-sm" onClick={() => { setEditingId(null); setForm({ type: 'plan', title: '', date: '', description: '', speaker: '', image_url: '' }); }}>取消</button>}
                     {msg && <span className="text-accent" style={{ fontSize: '0.85rem' }}>{msg}</span>}
                 </div>
             </form>
