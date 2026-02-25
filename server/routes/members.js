@@ -38,7 +38,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     try {
         await db.execute({
             sql: 'UPDATE members SET name=COALESCE(?,name), role=COALESCE(?,role), department=COALESCE(?,department), year=COALESCE(?,year), avatar_url=COALESCE(?,avatar_url), order_num=COALESCE(?,order_num) WHERE id=?',
-            args: [name, role, department, year, avatar_url, order_num, req.params.id]
+            args: [name ?? null, role ?? null, department ?? null, year ?? null, avatar_url ?? null, order_num ?? null, req.params.id]
         });
         const memberResult = await db.execute({
             sql: 'SELECT * FROM members WHERE id = ?',
