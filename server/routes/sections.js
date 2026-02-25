@@ -47,7 +47,7 @@ router.put('/:key', authMiddleware, async (req, res) => {
         } else {
             await db.execute({
                 sql: 'UPDATE sections SET title = COALESCE(?, title), content = COALESCE(?, content), updated_at = CURRENT_TIMESTAMP WHERE key = ?',
-                args: [title, content, req.params.key]
+                args: [title ?? null, content ?? null, req.params.key]
             });
         }
 
