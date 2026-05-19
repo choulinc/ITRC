@@ -4,6 +4,44 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import Footer from '../components/Footer';
 
+// ===================== Shared Image Uploader Helper =====================
+function ImageUploader({ value, onChange, label = '上傳圖片', disabled = false }) {
+    const [uploading, setUploading] = useState(false);
+    const [uploadMsg, setUploadMsg] = useState('');
+
+    const handleUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setUploading(true);
+        setUploadMsg('上傳圖片中...');
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const res = await api.post('/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            onChange(res.data.url);
+            setUploadMsg('✓ 圖片上傳成功');
+        } catch (err) {
+            console.error('Upload error:', err);
+            setUploadMsg('❌ 圖片上傳失敗: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setUploading(false);
+            e.target.value = '';
+        }
+    };
+
+    return (
+        <div className="form-group">
+            <label>{label} (Cloudinary 雲端上傳)</label>
+            <input type="file" accept="image/*" onChange={handleUpload} disabled={disabled || uploading} style={{ marginBottom: 8 }} />
+            <input placeholder="或直接貼上圖片網址" value={value || ''} onChange={e => onChange(e.target.value)} />
+            {uploadMsg && <span className="text-accent" style={{ fontSize: '0.8rem', display: 'block', marginTop: 4 }}>{uploadMsg}</span>}
+            {value && <img src={value} alt="預覽" style={{ marginTop: 10, maxHeight: 80, borderRadius: 5, objectFit: 'cover' }} />}
+        </div>
+    );
+}
+
 const TABS = [
     { key: 'sections', label: '頁面內容' },
     { key: 'achievements', label: '成果發表' },
@@ -228,7 +266,7 @@ function AchievementsEditor() {
 // ===================== Members Editor =====================
 function MembersEditor() {
     const [items, setItems] = useState([]);
-    const [form, setForm] = useState({ name: '', role: '', department: '', year: '' });
+    const [form, setForm] = useState({ name: '', role: '', department: '', year: '', avatar_url: '' });
     const [editingId, setEditingId] = useState(null);
     const [msg, setMsg] = useState('');
 
@@ -249,7 +287,7 @@ function MembersEditor() {
                 await api.post('/members', form);
                 setMsg('✓ 已新增');
             }
-            setForm({ name: '', role: '', department: '', year: '' });
+            setForm({ name: '', role: '', department: '', year: '', avatar_url: '' });
             setEditingId(null);
             fetchData();
         } catch (err) {
@@ -259,7 +297,7 @@ function MembersEditor() {
 
     const handleEdit = (item) => {
         setEditingId(item.id);
-        setForm({ name: item.name, role: item.role || '', department: item.department || '', year: item.year || '' });
+        setForm({ name: item.name, role: item.role || '', department: item.department || '', year: item.year || '', avatar_url: item.avatar_url || '' });
     };
 
     const handleDelete = async (id) => {
@@ -290,9 +328,14 @@ function MembersEditor() {
                         <input placeholder="例: 大三" value={form.year} onChange={e => setForm({ ...form, year: e.target.value })} />
                     </div>
                 </div>
+                <ImageUploader
+                    value={form.avatar_url}
+                    onChange={(url) => setForm(prev => ({ ...prev, avatar_url: url }))}
+                    label="大頭照"
+                />
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <button type="submit" className="btn btn-primary btn-sm">{editingId ? '更新' : '新增成員'}</button>
-                    {editingId && <button type="button" className="btn btn-outline btn-sm" onClick={() => { setEditingId(null); setForm({ name: '', role: '', department: '', year: '' }); }}>取消</button>}
+                    {editingId && <button type="button" className="btn btn-outline btn-sm" onClick={() => { setEditingId(null); setForm({ name: '', role: '', department: '', year: '', avatar_url: '' }); }}>取消</button>}
                     {msg && <span className="text-accent" style={{ fontSize: '0.85rem' }}>{msg}</span>}
                 </div>
             </form>
@@ -300,10 +343,13 @@ function MembersEditor() {
             <div className="admin-item-list">
                 {items.map(item => (
                     <div key={item.id} className="admin-item">
-                        <div>
-                            <strong>{item.name}</strong>
-                            {item.role && <span className="text-accent" style={{ marginLeft: 8 }}>{item.role}</span>}
-                            {item.department && <span className="text-secondary" style={{ marginLeft: 8, fontSize: '0.85rem' }}>{item.department}</span>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            {item.avatar_url && <img src={item.avatar_url} alt={item.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />}
+                            <div>
+                                <strong>{item.name}</strong>
+                                {item.role && <span className="text-accent" style={{ marginLeft: 8 }}>{item.role}</span>}
+                                {item.department && <span className="text-secondary" style={{ marginLeft: 8, fontSize: '0.85rem' }}>{item.department}</span>}
+                            </div>
                         </div>
                         <div className="admin-item-actions">
                             <button className="btn btn-outline btn-sm" onClick={() => handleEdit(item)}>編輯</button>
@@ -322,7 +368,6 @@ function ActivitiesEditor() {
     const [form, setForm] = useState({ type: 'plan', title: '', date: '', description: '', speaker: '', image_url: '' });
     const [editingId, setEditingId] = useState(null);
     const [msg, setMsg] = useState('');
-    const [uploading, setUploading] = useState(false);
 
     const fetchData = useCallback(async () => {
         const res = await api.get('/activities');
@@ -360,37 +405,6 @@ function ActivitiesEditor() {
         fetchData();
     };
 
-    const uploadImage = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        setUploading(true);
-        setMsg('上傳圖片中...');
-        const formData = new FormData();
-        formData.append('image', file);
-        try {
-            // 使用 Imgur API上傳照片
-            const clientId = import.meta.env.VITE_IMGUR_CLIENT_ID || '546c25a59c58ad7';
-            const response = await fetch('https://api.imgur.com/3/image', {
-                method: 'POST',
-                headers: { 'Authorization': `Client-ID ${clientId}` },
-                body: formData
-            });
-            const result = await response.json();
-            if (result.success) {
-                setForm(prev => ({ ...prev, image_url: result.data.link }));
-                setMsg('✓ 圖片上傳成功');
-            } else {
-                throw new Error(result.data.error || 'Upload failed');
-            }
-        } catch (err) {
-            console.error('Imgur upload error:', err);
-            setMsg('❌ 圖片上傳失敗');
-        } finally {
-            setUploading(false);
-            e.target.value = ''; // Reset file input
-        }
-    };
-
     return (
         <div>
             <h2 className="mb-3">活動管理</h2>
@@ -423,15 +437,14 @@ function ActivitiesEditor() {
                         <label>備註/其他連結</label>
                         <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} placeholder="支援 Markdown 語法 (如: [顯示名稱](網址))" />
                     </div>
-                    <div className="form-group">
-                        <label>活動照片 (Imgur上傳)</label>
-                        <input type="file" accept="image/*" onChange={uploadImage} disabled={uploading} style={{ marginBottom: 8 }} />
-                        <input placeholder="或直接貼上圖片網址" value={form.image_url} onChange={e => setForm({ ...form, image_url: e.target.value })} />
-                        {form.image_url && <img src={form.image_url} alt="預覽" style={{ marginTop: 10, maxHeight: 80, borderRadius: 5, objectFit: 'cover' }} />}
-                    </div>
+                    <ImageUploader
+                        value={form.image_url}
+                        onChange={(url) => setForm(prev => ({ ...prev, image_url: url }))}
+                        label="活動照片"
+                    />
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button type="submit" className="btn btn-primary btn-sm" disabled={uploading}>{editingId ? '更新' : '新增活動'}</button>
+                    <button type="submit" className="btn btn-primary btn-sm">{editingId ? '更新' : '新增活動'}</button>
                     {editingId && <button type="button" className="btn btn-outline btn-sm" onClick={() => { setEditingId(null); setForm({ type: 'plan', title: '', date: '', description: '', speaker: '', image_url: '' }); }}>取消</button>}
                     {msg && <span className="text-accent" style={{ fontSize: '0.85rem' }}>{msg}</span>}
                 </div>
@@ -440,11 +453,14 @@ function ActivitiesEditor() {
             <div className="admin-item-list">
                 {items.map(item => (
                     <div key={item.id} className="admin-item">
-                        <div>
-                            <span className="category-tag" style={{ marginRight: 8 }}>{item.type === 'record' ? '紀錄' : '規劃'}</span>
-                            <strong>{item.title}</strong>
-                            {item.speaker && <span className="text-secondary" style={{ marginLeft: 8, fontSize: '0.85rem' }}>| {item.speaker}</span>}
-                            {item.date && <span className="text-secondary" style={{ marginLeft: 8, fontSize: '0.85rem' }}>{item.date}</span>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            {item.image_url && <img src={item.image_url} alt={item.title} style={{ width: 48, height: 36, borderRadius: 4, objectFit: 'cover' }} />}
+                            <div>
+                                <span className="category-tag" style={{ marginRight: 8 }}>{item.type === 'record' ? '紀錄' : '規劃'}</span>
+                                <strong>{item.title}</strong>
+                                {item.speaker && <span className="text-secondary" style={{ marginLeft: 8, fontSize: '0.85rem' }}>| {item.speaker}</span>}
+                                {item.date && <span className="text-secondary" style={{ marginLeft: 8, fontSize: '0.85rem' }}>{item.date}</span>}
+                            </div>
                         </div>
                         <div className="admin-item-actions">
                             <button className="btn btn-outline btn-sm" onClick={() => handleEdit(item)}>編輯</button>

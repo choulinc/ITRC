@@ -22,21 +22,63 @@ app.use('/api/activities', require('./routes/activities'));
 app.use('/api/experiences', require('./routes/experiences'));
 app.use('/api/search', require('./routes/search'));
 
-// Upload route
+// Upload route (Cloudinary)
 const multer = require('multer');
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, path.join(__dirname, 'uploads')),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`);
+const cloudinary = require('cloudinary').v2;
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Use memory storage so files aren't saved to disk (Render free tier has ephemeral FS)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('只能上傳圖片檔案'), false);
+        }
     }
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+
 const { authMiddleware } = require('./middleware/auth');
 
-app.post('/api/upload', authMiddleware, upload.single('file'), (req, res) => {
+app.post('/api/upload', authMiddleware, upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: '未選擇檔案' });
-    res.json({ url: `/uploads/${req.file.filename}` });
+
+    try {
+        // Upload buffer to Cloudinary
+        const result = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+                {
+                    folder: 'itrc',
+                    resource_type: 'image',
+                    transformation: [
+                        { quality: 'auto', fetch_format: 'auto' }
+                    ]
+                },
+                (error, result) => {
+                    if (error) reject(error);
+                    else resolve(result);
+                }
+            );
+            stream.end(req.file.buffer);
+        });
+
+        res.json({
+            url: result.secure_url,
+            public_id: result.public_id,
+            width: result.width,
+            height: result.height,
+        });
+    } catch (err) {
+        console.error('Cloudinary upload error:', err);
+        res.status(500).json({ error: '圖片上傳失敗: ' + err.message });
+    }
 });
 
 // Health check
