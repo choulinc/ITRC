@@ -46,7 +46,8 @@ const TABS = [
     { key: 'sections', label: '頁面內容' },
     { key: 'achievements', label: '成果發表' },
     { key: 'members', label: '社團成員' },
-    { key: 'activities', label: '活動管理' },
+    { key: 'plans', label: '活動規劃' },
+    { key: 'records', label: '活動紀錄' },
     { key: 'experiences', label: '參與心得' },
 ];
 
@@ -78,7 +79,8 @@ export default function AdminPage() {
                     {activeTab === 'sections' && <SectionsEditor />}
                     {activeTab === 'achievements' && <AchievementsEditor />}
                     {activeTab === 'members' && <MembersEditor />}
-                    {activeTab === 'activities' && <ActivitiesEditor />}
+                    {activeTab === 'plans' && <SingleTypeActivitiesEditor activityType="plan" title="活動規劃管理" subtitle="管理未來預計舉辦的活動" />}
+                    {activeTab === 'records' && <SingleTypeActivitiesEditor activityType="record" title="活動紀錄管理" subtitle="管理已完成的活動記錄與照片" />}
                     {activeTab === 'experiences' && <ExperiencesEditor />}
                 </div>
             </div>
@@ -362,17 +364,18 @@ function MembersEditor() {
     );
 }
 
-// ===================== Activities Editor =====================
-function ActivitiesEditor() {
+// ===================== Single Type Activities Editor (reusable for plans & records) =====================
+function SingleTypeActivitiesEditor({ activityType, title, subtitle }) {
     const [items, setItems] = useState([]);
-    const [form, setForm] = useState({ type: 'plan', title: '', date: '', description: '', speaker: '', image_url: '' });
+    const emptyForm = { type: activityType, title: '', date: '', description: '', speaker: '', image_url: '' };
+    const [form, setForm] = useState(emptyForm);
     const [editingId, setEditingId] = useState(null);
     const [msg, setMsg] = useState('');
 
     const fetchData = useCallback(async () => {
-        const res = await api.get('/activities');
+        const res = await api.get(`/activities?type=${activityType}`);
         setItems(res.data);
-    }, []);
+    }, [activityType]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -386,7 +389,7 @@ function ActivitiesEditor() {
                 await api.post('/activities', form);
                 setMsg('✓ 已新增');
             }
-            setForm({ type: 'plan', title: '', date: '', description: '', speaker: '', image_url: '' });
+            setForm(emptyForm);
             setEditingId(null);
             fetchData();
         } catch (err) {
@@ -396,7 +399,7 @@ function ActivitiesEditor() {
 
     const handleEdit = (item) => {
         setEditingId(item.id);
-        setForm({ type: item.type, title: item.title, date: item.date || '', description: item.description || '', speaker: item.speaker || '', image_url: item.image_url || '' });
+        setForm({ type: activityType, title: item.title, date: item.date || '', description: item.description || '', speaker: item.speaker || '', image_url: item.image_url || '' });
     };
 
     const handleDelete = async (id) => {
@@ -407,30 +410,22 @@ function ActivitiesEditor() {
 
     return (
         <div>
-            <h2 className="mb-3">活動管理</h2>
+            <h2 className="mb-3">{title}</h2>
+            {subtitle && <p className="text-secondary mb-3">{subtitle}</p>}
             <form className="admin-form card mb-4" onSubmit={handleSubmit} style={{ maxWidth: 700, padding: 24 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     <div className="form-group">
-                        <label>類型</label>
-                        <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-                            <option value="plan">活動規劃</option>
-                            <option value="record">活動紀錄</option>
-                        </select>
-                    </div>
-                    <div className="form-group">
                         <label>日期</label>
                         <input placeholder="例: 114年09月26日(五)" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
-                    </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <div className="form-group">
-                        <label>主題</label>
-                        <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
                     </div>
                     <div className="form-group">
                         <label>主講人</label>
                         <input placeholder="例: 王昭文 教授" value={form.speaker} onChange={e => setForm({ ...form, speaker: e.target.value })} />
                     </div>
+                </div>
+                <div className="form-group">
+                    <label>主題</label>
+                    <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
                     <div className="form-group">
@@ -444,8 +439,8 @@ function ActivitiesEditor() {
                     />
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button type="submit" className="btn btn-primary btn-sm">{editingId ? '更新' : '新增活動'}</button>
-                    {editingId && <button type="button" className="btn btn-outline btn-sm" onClick={() => { setEditingId(null); setForm({ type: 'plan', title: '', date: '', description: '', speaker: '', image_url: '' }); }}>取消</button>}
+                    <button type="submit" className="btn btn-primary btn-sm">{editingId ? '更新' : '新增'}</button>
+                    {editingId && <button type="button" className="btn btn-outline btn-sm" onClick={() => { setEditingId(null); setForm(emptyForm); }}>取消</button>}
                     {msg && <span className="text-accent" style={{ fontSize: '0.85rem' }}>{msg}</span>}
                 </div>
             </form>
@@ -456,7 +451,6 @@ function ActivitiesEditor() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             {item.image_url && <img src={item.image_url} alt={item.title} style={{ width: 48, height: 36, borderRadius: 4, objectFit: 'cover' }} />}
                             <div>
-                                <span className="category-tag" style={{ marginRight: 8 }}>{item.type === 'record' ? '紀錄' : '規劃'}</span>
                                 <strong>{item.title}</strong>
                                 {item.speaker && <span className="text-secondary" style={{ marginLeft: 8, fontSize: '0.85rem' }}>| {item.speaker}</span>}
                                 {item.date && <span className="text-secondary" style={{ marginLeft: 8, fontSize: '0.85rem' }}>{item.date}</span>}
