@@ -55,6 +55,7 @@ export default function Navbar() {
                         <li><Link to="/achievements" className={isActive('/achievements')}>成果發表</Link></li>
                         <li><Link to="/activities" className={isActive('/activities')}>活動紀錄</Link></li>
                         <li><Link to="/plans" className={isActive('/plans')}>活動規劃</Link></li>
+                        <li><Link to="/resources" className={isActive('/resources')}>學習資源</Link></li>
                         <li><Link to="/experiences" className={isActive('/experiences')}>參與心得</Link></li>
                         {isAdmin && (
                             <>

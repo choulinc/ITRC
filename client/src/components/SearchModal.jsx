@@ -7,7 +7,7 @@ const typeLabels = {
     achievement: '成果發表',
     activity: '活動',
     experience: '參與心得',
-    member: '社團成員',
+    member: '社團幹部',
 };
 
 export default function SearchModal({ onClose }) {

@@ -5,6 +5,7 @@ import AchievementsPage from './pages/AchievementsPage';
 import ActivityRecordsPage from './pages/ActivityRecordsPage';
 import ActivityPlansPage from './pages/ActivityPlansPage';
 import ExperiencesPage from './pages/ExperiencesPage';
+import ResourcesPage from './pages/ResourcesPage';
 import LoginPage from './pages/LoginPage';
 import AdminPage from './pages/AdminPage';
 
@@ -18,6 +19,7 @@ export default function App() {
                 <Route path="/activities" element={<ActivityRecordsPage />} />
                 <Route path="/plans" element={<ActivityPlansPage />} />
                 <Route path="/experiences" element={<ExperiencesPage />} />
+                <Route path="/resources" element={<ResourcesPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/admin" element={<AdminPage />} />
             </Routes>
