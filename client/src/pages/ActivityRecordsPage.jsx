@@ -126,7 +126,8 @@ export default function ActivityRecordsPage() {
         if (!activeSemester) return;
         setLoading(true);
         api.get('/activities', { params: { type: 'record', semester: activeSemester } }).then(res => {
-            setActivities(res.data);
+            const sorted = res.data.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+            setActivities(sorted);
             setLoading(false);
         }).catch(() => setLoading(false));
     }, [activeSemester]);
