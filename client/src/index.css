@@ -337,7 +337,7 @@ h6 {
     top: 72px;
     left: 0;
     right: 0;
-    bottom: 0;
+    height: calc(100vh - 72px);
     flex-direction: column;
     background: var(--bg-white);
     padding: 24px;
