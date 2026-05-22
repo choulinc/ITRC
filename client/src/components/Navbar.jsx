@@ -63,9 +63,7 @@ export default function Navbar() {
                                 <li><button onClick={logout} style={{ color: '#fc8181' }}>登出</button></li>
                             </>
                         )}
-                        {!isAdmin && (
-                            <li><Link to="/login" className={isActive('/login')}>登入</Link></li>
-                        )}
+
                         <li>
                             <button className="search-btn" onClick={() => setSearchOpen(true)}>
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
