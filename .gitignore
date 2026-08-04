@@ -61,4 +61,9 @@ build/
 .vscode/
 *.swp
 *.swo
-rm.mdparsed_text.txt
+
+# Local documentation and import artifacts
+/NSYSU ITRC.html
+/NSYSU ITRC - 活動紀錄.html
+/parsed_text.txt
+/rm.md
