@@ -10,15 +10,22 @@ async function seed() {
     try {
         console.log('Starting seed process...');
 
-        // Admin User
+        // Admin user: credentials must come from the deployment environment.
         const existingUsers = await db.execute('SELECT COUNT(*) as count FROM users');
         if (existingUsers.rows[0].count === 0) {
-            const hash = bcrypt.hashSync('[REDACTED]', 10);
-            await db.execute({
-                sql: "INSERT INTO users (username, password_hash, role) VALUES ('admin', ?, 'admin')",
-                args: [hash]
-            });
-            console.log('✓ Default admin user created (admin / [REDACTED])');
+            const adminUsername = process.env.ADMIN_USERNAME;
+            const adminPassword = process.env.ADMIN_PASSWORD;
+
+            if (!adminUsername || !adminPassword) {
+                console.warn('⊘ Admin user not created: ADMIN_USERNAME and ADMIN_PASSWORD are required');
+            } else {
+                const hash = bcrypt.hashSync(adminPassword, 10);
+                await db.execute({
+                    sql: "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')",
+                    args: [adminUsername, hash]
+                });
+                console.log('✓ Initial admin user created');
+            }
         } else {
             console.log('⊘ Admin user already exists');
         }
